@@ -56,7 +56,7 @@ end #end iterating over legend items
 # 
 list_of_class_ids.each do |type_of_date|
   search_string = 'a.' + type_of_date[0] + '-style'
-#  puts "checking for: " + search_string
+  puts "checking for: " + search_string
   puts "Scheduled sitting days for: " + type_of_date[1]
   date_cells = capybara.all(search_string)
 
@@ -76,7 +76,8 @@ list_of_class_ids.each do |type_of_date|
         date: date_string,
         type_of_sitting_day: type_of_date[1].to_s
       }
-      ScraperWiki.save_sqlite([:date], data)
+      puts data
+#      ScraperWiki.save_sqlite([:date], data)
     end
   end # end iterating over found sitting dates
 
