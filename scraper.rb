@@ -70,14 +70,18 @@ list_of_class_ids.each do |type_of_date|
     else 
       puts date_string
       date_counter += 1
+      
+      #create data object and save sitting date to table
+      data = {
+        date: date_string,
+        type_of_sitting_day: type_of_date[1].to_s
+      }
+      ScraperWiki.save_sqlite([:date], data)
     end
   end # end iterating over found sitting dates
 
   puts date_counter.to_s + " sitting days found."
 end # end of iterating over sitting date types
-
-# Find calendar div on the page using css selector
-# node = capybara.find('div.scheduler').native
 
 
 # # Write out to the sqlite database using scraperwiki library
