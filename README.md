@@ -1,4 +1,4 @@
-The beginnings of a Mechanize scraper to read Hansard dates
+The beginnings of a scraper to read Hansard dates
 
 Scraper is built using Poltergeist / Capybara due to heavy AJAX insertion of content that doesn't appear when scraped with Mechanize
 
