@@ -84,6 +84,19 @@ wanted_class_ids.each do |type_of_date|
     # Just a hunch that writing data out to Sqlite deletes something?
 #    sitting_type = type_of_date[1].to_s
 
+      # the date string has a "/" in it, need to replace with "."
+      # NB the really sneaky thing is, the dates are wrong - 
+      # "Month" is actually m-1 as January is month 'zero'. 
+      date_string = date_string.gsub("/",".")
+
+      d = date_string.match(/([0-9]+).([0-9]+).([0-9]+)/)
+ 
+      day = d[1].to_i
+      month = d[2].to_i + 1
+      year = d[3].to_i
+
+      date_string = day.to_s + "." + month.to_s + "." + year.to_s
+
     sitting_date.trigger('click')
     puts "clicked!" unless $csvout
    
@@ -100,21 +113,6 @@ wanted_class_ids.each do |type_of_date|
 
       hansard_file_ID = linkbox.find('div.hansard-icon-xml')['data-value'].to_s
 #      puts "Hansard File ID: " + hansard_file_ID
-
-      # the date string has a "/" in it, need to replace with "."
-      # NB the really sneaky thing is, the dates are wrong - 
-      # "Month" is actually m-1 as January is month 'zero'. 
-      date_string = date_string.gsub("/",".")
-
-      d = text.match(/([0-9]+).([0-9]+).([0-9]+)/)
- 
-      day = d[1].to_i
-      month = d[2].to_i + 1
-      year = d[3].to_i
-
-      date_string = day.to_s + "." + month.to_s + "." + year.to_s
-  
-
 
 # Once you have each hansard-icon-xml div you can use this line
       # to construct the download URL - but there's a hansard-icon-xml div
