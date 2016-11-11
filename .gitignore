@@ -1,3 +1,4 @@
 # Ignore output of scraper
 *.sqlite
 *.csv
+*.json

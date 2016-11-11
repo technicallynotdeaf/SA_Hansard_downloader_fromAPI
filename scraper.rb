@@ -17,8 +17,9 @@ require 'scraperwiki'
 require 'capybara'
 require 'capybara/poltergeist'
 
-
 # from Hansard server content-type is text/html, attachment is xml
+json_download_year_url = "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetYearlyEvents/"
+
 xml_download_url = "http://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=tocxml&d=HANSARD-10-17452"
 
 fragment_download_url = "https://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=fragment&d=HANSARD-11-24737"
@@ -31,25 +32,40 @@ $debug = TRUE
 $csvoutput = FALSE
 $sqloutput = FALSE
 
+class JSONDownloader
 
-capybara = Capybara::Session.new(:poltergeist)
+  def init
+    capybara = Capybara::Session.new(:poltergeist)
+  
+    # The Javascript is buggy, we have to ignore errors
+    # or we get nowhere
+    capybara.driver.browser.js_errors = false
+    capybara.driver.headers = { "User-Agent" => fF_user_agent_string }
+  
+    # Read in the page
+    capybara.visit(xml_download_url)
+  end
 
-# The Javascript is buggy, we have to ignore errors
-# or we get nowhere
-capybara.driver.browser.js_errors = false
-capybara.driver.headers = { "User-Agent" => fF_user_agent_string }
+  def download_year_index(year)
+    url_to_load = json_download_year_url + year.to_s
+    filename = "#{year.to_s}_hansard.json"
+    
+    puts "downloading file"   
+    `curl --output #{filename} "#{url_to_load}"`
+  end
 
-# Read in the page
-capybara.visit(xml_download_url)
+#  useful for troubleshooting... 
+#  puts capybara.status_code
+#  puts capybara.response_headers
+  
+  # puts capybara.page.source
 
-puts capybara.status_code
-puts capybara.response_headers
+end #end JSONDownloader class
 
-# puts capybara.page.source
+JSONDownloader.download_year_index(2016) 
 
-# Read the Legend to find out the dates with data of interest... 
-#legend_divs = capybara.all('div.hansard-legend')
-
+#  `curl --silent --output data/representatives.csv "https://api.morph.io/alisonkeen/SA_members_for_OA_parser/data.csv?key=#{conf.morph_api_key}&query=select%20*%20from%20'data'"`
+#  `curl --silent --output data/senators.csv "https://api.morph.io/alisonkeen/SA_senators_for_OA_parser/data.csv?key=#{conf.morph_api_key}&query=select%20*%20from%20'data'"`
 
 # # Write out to the sqlite database using scraperwiki library
 # ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
