@@ -1,4 +1,4 @@
-#
+
 # Scraper to download SA Hansard XML files using API
 # 
 # In order to facilitate automatically downloading each day's hansard
@@ -15,12 +15,11 @@
 # camelCase for variables... oops 
 
 require 'scraperwiki'
+require 'json'
+require 'fileutils'
 
 # from Hansard server content-type is text/html, attachment is xml
 
-xml_download_url = "http://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=tocxml&d=HANSARD-10-17452"
-
-fragment_download_url = "https://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=fragment&d=HANSARD-11-24737"
 $debug = TRUE
 $csvoutput = FALSE
 $sqloutput = FALSE
@@ -28,93 +27,129 @@ $sqloutput = FALSE
 module JSONDownloader
 
   # The URLs to access the API... 
-  @json_download_year_url = "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetYearlyEvents/"
+  @jsonDownloadYearURL = "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetYearlyEvents/"
 
-  @json_download_toc_url = "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetByDate"
+  @jsonDownloadTocUrl = "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetByDate"
+ 
+  # @jsonDownloadTocUrl = "http://pipeproject.info/date/GetByDate"
 
-  def JSONDownloader.download_all_fragments(year) 
+
+  def JSONDownloader.downloadAllFragments(year) 
   
     #Annual Index is a special case - different API URL  
-    annualIndexFilename = download_annual_index(year)
+    annualIndexFilename = downloadAnnualIndex(year)
 
-    get_toc_hash(annualIndexFilename) do |toc_saph_filename| 
+    downloadEachToc(annualIndexFilename) 
+
 
       # then we read and load the JSON
       # and request each fragment for each day... 
-      download_toc(toc_saph_filename) 
+#       downloadToc(toc_saphFilename) 
 
       # then get the hash of fragments from each TOC file... 
 
         # and download each one. 
 
-    end
+    if $debug
 
+      puts "\nTesting TOC download URL... ======== \n"
+      `curl --output HANSARD_test_toc  "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetByDate" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: */*" --data-binary "{""DocumentId"" : ""HANSARD-11-22597""}"`
+
+      puts "\nTesting Fragment download URL... ======== \n" 
+      `curl --output HANSARD_test_fragment "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetFragmentHtml" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: application/json, text/javascript, */*; q=0.01" -H "X-Requested-With: XMLHttpRequest" --data-binary "{""DocumentId"" : ""HANSARD-11-22542""}"`
+      `cat HANSARD_test_fragment`
+
+    end # end API example runs
 
   end
 
-  # read horrible JSON file and get toc filenames
-  def JSONDownloader.get_toc_hash(annualIndexFilename)
+  # "saphFilename" will be soemthing like "HANSARD-10-2343" with no
+  # file extension. 
+  def JSONDownloader.downloadToc(saphFilename, transcriptDate)
 
-    puts "Testing if JSON parsing even works" 
-    json = JSON.parse '{"foo":"bar", "ping":"pong"}'
-    puts json.keys # prints "bar"
+    puts "Filename requested: " + saphFilename if $debug
+
+    curlFlags = " -f " # Doesn't save HTML error pages instead of file
+    requestHeaders = " -H \"Content-Type: application/json; charset=UTF-8\" -H \"Accept: */*\" --request POST --data-binary \"{\"\"DocumentId\"\" : \"\"#{saphFilename}\"\"}\" "
+
+    urlToLoad = @jsonDownloadTocUrl  
+
+    if !File.exist?( "downloaded/#{transcriptDate}" ) and
+      !File.directory?( "downloaded/#{transcriptDate}" )
+
+      FileUtils::mkdir_p "downloaded/#{transcriptDate}"
+    end #end if
+
+    tocFilename = "downloaded/#{transcriptDate}/#{saphFilename}_hansard.json"
+
+    # First we download the table of contents    
+    fullCMD = "curl --output #{tocFilename} #{curlFlags} #{requestHeaders} #{urlToLoad}"
+    puts "downloading TOC file as: #{fullCMD}" if $debug 
+
+    returnval = `curl --output #{tocFilename} #{curlFlags} #{requestHeaders} #{urlToLoad}`
+
+    puts "Return val: #{returnval.to_s}"
+
+    # Then we turn it into XML... 
+ 
+    tocFilename # The output of the method. ruby doesn't use 'return'
+  end
+
+  
+  # read horrible JSON file and get toc filenames
+  def JSONDownloader.downloadEachToc(annualIndexFilename)
 
     puts "Parsing annual index #{annualIndexFilename}" if $debug
     rawJSON = File.read(annualIndexFilename)
     loadedJSON = JSON.load rawJSON # Why is this returning a String!?
     parsedJSON = JSON.load loadedJSON #will trying twice help?
 
-    parsedJSON.each do |event|
+    parsedJSON.each do |event| # for-each-date
       puts event.keys if $debug
-      puts "Available for..." + event['date'].to_s
-      puts event['Events'].to_s
-    end
+      record_date =  event['date'].to_s
 
-#    obj['date'].each do |date| 
-#      puts "Date..." if $debug
-#    end
+      puts "Available for..." + record_date if $debug
+
+      event['Events'].each do |record| # for each transcript on date
+        puts "\nEvent: " + record.to_s if $debug
+        saphFilename = record['TocDocId'].to_s
+   
+
+        if saphFilename.empty?
+          puts 'Have you got the right key? saph filename not found.'
+          puts " Keys in record: "
+          puts record.keys
+          puts " -- end record of transcript -- "
+        else
+#          tocFilename = JSONDownloader.downloadToc( saphFilename , record_date )
+#           puts "Downloaded: " + tocFilename if $debug
+        end
+
+
+      end # end for-each-transcript-on-date block
+      
+    end # end for-each-date block
 
   end
 
   # Puts the raw, no-line-breaks JSON into a file and
   # returns the file name.
-  def JSONDownloader.download_annual_index(year)
+  def JSONDownloader.downloadAnnualIndex(year)
 
-    url_to_load = @json_download_year_url + year.to_s
-    filename = "#{year.to_s}_hansard.json"
+    urlToLoad = @jsonDownloadYearURL + year.to_s
+    filename = "downloaded/#{year.to_s}_hansard.json"
     
     puts "downloading file"   
-    `curl --output #{filename} "#{url_to_load}"`
+    `curl --output #{filename} "#{urlToLoad}"`
  
     filename # The output of the method. ruby doesn't use 'return'
   end
 
 
 
-
-  # "saph_filename" will be soemthing like "HANSARD-10-2343" with no
-  # file extension. 
-  def JSONDownloader.download_toc(saph_filename)
-
-    request_headers = " -H \"Content-Type: application/json; charset=UTF-8\" -H \"Accept: */*\" --data-binary \"{\"\"DocumentId\"\" : \"\"#{saph_filename}\"\"}\""
-
-    url_to_load = @json_download_toc_url  + request_headers
-
-    toc_filename = "#{saph_filename}_hansard.json"
-
-    # First we download the table of contents    
-    puts "downloading TOC file"   
-    `curl --output #{toc_filename} "#{url_to_load}"`
-
-    # Then we turn it into XML... 
- 
-    filename # The output of the method. ruby doesn't use 'return'
-  end
 
 end #end JSONDownloader class
 
-JSONDownloader.download_all_fragments(2016) if $debug
+JSONDownloader.downloadAllFragments(2016) if $debug
 
 
-# # Write out to the sqlite database using scraperwiki library
-# ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
