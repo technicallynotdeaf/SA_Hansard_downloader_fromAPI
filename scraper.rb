@@ -9,7 +9,10 @@
 # SA Parliament Hansard API Docs are here: 
 # 
 # https://parliament-api-docs.readthedocs.io/en/latest/south-australia/#read-data 
-# 
+#
+# Apologies for flagrant violation of coding conventions.
+# I think I realised halfway through this one you're supposed to use
+# camelCase for variables... oops 
 
 require 'scraperwiki'
 
@@ -18,11 +21,6 @@ require 'scraperwiki'
 xml_download_url = "http://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=tocxml&d=HANSARD-10-17452"
 
 fragment_download_url = "https://hansardpublic.parliament.sa.gov.au/_layouts/15/Hansard/DownloadHansardFile.ashx?t=fragment&d=HANSARD-11-24737"
-# From own server it sends the file as content-type text/xml, 
-# pipe_download_url = "http://sa.pipeproject.info/xmldata/upper/HANSARD-10-17452.xml"
-
-fF_user_agent_string = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/54.0.2840.90 Safari/537.36"
-
 $debug = TRUE
 $csvoutput = FALSE
 $sqloutput = FALSE
@@ -37,9 +35,9 @@ module JSONDownloader
   def JSONDownloader.download_all_fragments(year) 
   
     #Annual Index is a special case - different API URL  
-    annual_index_filename = download_annual_index(year)
+    annualIndexFilename = download_annual_index(year)
 
-    get_toc_hash(annual_index_filename) do |toc_saph_filename| 
+    get_toc_hash(annualIndexFilename) do |toc_saph_filename| 
 
       # then we read and load the JSON
       # and request each fragment for each day... 
@@ -54,7 +52,29 @@ module JSONDownloader
 
   end
 
-  
+  # read horrible JSON file and get toc filenames
+  def JSONDownloader.get_toc_hash(annualIndexFilename)
+
+    puts "Testing if JSON parsing even works" 
+    json = JSON.parse '{"foo":"bar", "ping":"pong"}'
+    puts json.keys # prints "bar"
+
+    puts "Parsing annual index #{annualIndexFilename}" if $debug
+    rawJSON = File.read(annualIndexFilename)
+    loadedJSON = JSON.load rawJSON # Why is this returning a String!?
+    parsedJSON = JSON.load loadedJSON #will trying twice help?
+
+    parsedJSON.each do |event|
+      puts event.keys if $debug
+      puts "Available for..." + event['date'].to_s
+      puts event['Events'].to_s
+    end
+
+#    obj['date'].each do |date| 
+#      puts "Date..." if $debug
+#    end
+
+  end
 
   # Puts the raw, no-line-breaks JSON into a file and
   # returns the file name.
@@ -93,10 +113,8 @@ module JSONDownloader
 
 end #end JSONDownloader class
 
-JSONDownloader.download_all_fragments(2016) 
+JSONDownloader.download_all_fragments(2016) if $debug
 
-#  `curl --silent --output data/representatives.csv "https://api.morph.io/alisonkeen/SA_members_for_OA_parser/data.csv?key=#{conf.morph_api_key}&query=select%20*%20from%20'data'"`
-#  `curl --silent --output data/senators.csv "https://api.morph.io/alisonkeen/SA_senators_for_OA_parser/data.csv?key=#{conf.morph_api_key}&query=select%20*%20from%20'data'"`
 
 # # Write out to the sqlite database using scraperwiki library
 # ScraperWiki.save_sqlite(["name"], {"name" => "susan", "occupation" => "software developer"})
