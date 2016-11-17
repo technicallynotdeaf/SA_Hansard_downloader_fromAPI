@@ -20,9 +20,9 @@ require 'fileutils'
 
 # from Hansard server content-type is text/html, attachment is xml
 
-$debug = TRUE
+$debug = FALSE
 $csvoutput = FALSE
-$sqloutput = FALSE
+$sqloutput = TRUE
 
 module JSONDownloader
 
@@ -50,26 +50,28 @@ module JSONDownloader
 
         # and download each one. 
 
-    if $debug
+#    if $debug
 
-      puts "\nTesting TOC download URL... ======== \n"
-      `curl --output HANSARD_test_toc  "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetByDate" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: */*" --data-binary "{""DocumentId"" : ""HANSARD-11-22597""}"`
+#      puts "\nTesting TOC download URL... ======== \n"
+#      `curl --silent --output HANSARD_test_toc  "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetByDate" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: */*" --data-binary "{"DocumentId" : "HANSARD-11-22597"}"`
 
-      puts "\nTesting Fragment download URL... ======== \n" 
-      `curl --output HANSARD_test_fragment "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetFragmentHtml" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: application/json, text/javascript, */*; q=0.01" -H "X-Requested-With: XMLHttpRequest" --data-binary "{""DocumentId"" : ""HANSARD-11-22542""}"`
-      `cat HANSARD_test_fragment`
+#      puts "\nTesting Fragment download URL... ======== \n" 
+#      `curl --output HANSARD_test_fragment "https://hansardpublic.parliament.sa.gov.au/_vti_bin/Hansard/HansardData.svc/GetFragmentHtml" -H "Content-Type: application/json; charset=UTF-8" -H "Accept: application/json, text/javascript, */*; q=0.01" -H "X-Requested-With: XMLHttpRequest" --data-binary "{"DocumentId" : "HANSARD-11-22542"}"`
+#      `cat HANSARD_test_fragment`
 
-    end # end API example runs
+#    end # end API example runs
 
   end
 
+  # The API Is broken, so this method isn't called/used 
+  #            (it returns server errors as content)
   # "saphFilename" will be soemthing like "HANSARD-10-2343" with no
   # file extension. 
   def JSONDownloader.downloadToc(saphFilename, transcriptDate)
 
     puts "Filename requested: " + saphFilename if $debug
 
-    curlFlags = " -f " # Doesn't save HTML error pages instead of file
+    curlFlags = " --silent -f " # Doesn't save HTML error pages instead of file
     requestHeaders = " -H \"Content-Type: application/json; charset=UTF-8\" -H \"Accept: */*\" --request POST --data-binary \"{\"\"DocumentId\"\" : \"\"#{saphFilename}\"\"}\" "
 
     urlToLoad = @jsonDownloadTocUrl  
@@ -102,7 +104,7 @@ module JSONDownloader
     puts "Parsing annual index #{annualIndexFilename}" if $debug
     rawJSON = File.read(annualIndexFilename)
     loadedJSON = JSON.load rawJSON # Why is this returning a String!?
-    parsedJSON = JSON.load loadedJSON #will trying twice help?
+    parsedJSON = JSON.load loadedJSON # Needs to be parsed twice (!?)
 
     parsedJSON.each do |event| # for-each-date
       puts event.keys if $debug
@@ -113,16 +115,17 @@ module JSONDownloader
       event['Events'].each do |record| # for each transcript on date
         puts "\nEvent: " + record.to_s if $debug
         saphFilename = record['TocDocId'].to_s
+        saphChamber = record['Chamber'].to_s
    
 
         if saphFilename.empty?
-          puts 'Have you got the right key? saph filename not found.'
-          puts " Keys in record: "
-          puts record.keys
-          puts " -- end record of transcript -- "
+          puts " Keys in record: " if $debug
+          puts record.keys if $debug
+          puts " -- end record of transcript -- " if $debug
         else
 #          tocFilename = JSONDownloader.downloadToc( saphFilename , record_date )
 #           puts "Downloaded: " + tocFilename if $debug
+           puts "\"#{saphFilename}\",\"#{record_date}\",\"#{saphChamber}\"" if $sqloutput
         end
 
 
@@ -139,8 +142,8 @@ module JSONDownloader
     urlToLoad = @jsonDownloadYearURL + year.to_s
     filename = "downloaded/#{year.to_s}_hansard.json"
     
-    puts "downloading file"   
-    `curl --output #{filename} "#{urlToLoad}"`
+    puts "downloading file" if $debug  
+    `curl --silent --output #{filename} "#{urlToLoad}"`
  
     filename # The output of the method. ruby doesn't use 'return'
   end
@@ -150,6 +153,16 @@ module JSONDownloader
 
 end #end JSONDownloader class
 
-JSONDownloader.downloadAllFragments(2016) if $debug
+puts "\"Filename\",\"date\",\"house\"" if $csvoutput
+
+year = Date.today.year
+
+while year > 2006
+   JSONDownloader.downloadAllFragments(year)
+   year -= 1
+
+end
+
+
 
 
